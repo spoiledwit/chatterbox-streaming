@@ -73,7 +73,8 @@ async def root():
         "service": "Chatterbox Streaming TTS",
         "device": DEVICE,
         "endpoints": {
-            "POST /stream/audio": "Stream audio chunks as raw PCM",
+            "POST /stream/audio": "Stream audio chunks as raw PCM (default voice)",
+            "POST /stream/audio/clone": "Stream audio chunks with voice cloning (uses voice.wav)",
             "POST /stream/wav": "Stream complete WAV file",
             "POST /stream/chunks": "Stream base64-encoded audio chunks (JSON)",
         }
@@ -147,6 +148,48 @@ async def stream_audio(request: TTSRequest):
             exaggeration=request.exaggeration,
             cfg_weight=request.cfg_weight,
             temperature=request.temperature,
+        ),
+        media_type="audio/pcm",
+        headers={
+            "X-Sample-Rate": "24000",
+            "X-Channels": "1",
+            "X-Sample-Format": "s16le"
+        }
+    )
+
+
+@app.post("/stream/audio/clone")
+async def stream_audio_clone(request: TTSRequest):
+    """
+    Stream raw PCM audio chunks with voice cloning
+    Uses the custom voice from voice.wav file
+    Returns: audio/pcm stream (s16le, 24kHz, mono)
+
+    Usage with curl:
+    curl -X POST http://localhost:8002/stream/audio/clone \
+      -H "Content-Type: application/json" \
+      -d '{"text": "Hello world"}' \
+      --output output.raw
+
+    Play with: ffplay -f s16le -ar 24000 -ac 1 output.raw
+    """
+    if not MODEL:
+        raise HTTPException(status_code=503, detail="Model not loaded")
+
+    # Path to the voice clone reference file
+    VOICE_CLONE_PATH = "/workspace/chatterbox-streaming/voice.wav"
+
+    if not os.path.exists(VOICE_CLONE_PATH):
+        raise HTTPException(status_code=404, detail=f"Voice clone file not found at {VOICE_CLONE_PATH}")
+
+    return StreamingResponse(
+        audio_chunk_generator(
+            text=request.text,
+            chunk_size=request.chunk_size,
+            exaggeration=request.exaggeration,
+            cfg_weight=request.cfg_weight,
+            temperature=request.temperature,
+            audio_prompt_path=VOICE_CLONE_PATH,
         ),
         media_type="audio/pcm",
         headers={

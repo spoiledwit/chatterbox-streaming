@@ -4,6 +4,15 @@ from chatterbox.tts import ChatterboxTTS
 from huggingface_hub import login
 import os
 
+# Try to import sounddevice for playback
+try:
+    import sounddevice as sd
+    import numpy as np
+    AUDIO_AVAILABLE = True
+except ImportError:
+    AUDIO_AVAILABLE = False
+    print("⚠️  sounddevice not available. Install with: pip install sounddevice")
+
 # Optional: Set your HF token here or use environment variable
 HF_TOKEN = os.getenv("HF_TOKEN")  # or paste your token: "hf_xxxxx"
 if HF_TOKEN:
@@ -22,6 +31,11 @@ text = "Today is the day. I want to move like a titan at dawn, sweat like a god 
 
 # STREAMING VERSION - generates and yields audio in real-time
 print("\n=== STREAMING GENERATION ===")
+if AUDIO_AVAILABLE:
+    print("🔊 Real-time playback enabled!")
+else:
+    print("📁 Audio will be saved to file only (no playback)")
+
 audio_chunks = []
 for audio_chunk, metrics in model.generate_stream(
     text,
@@ -34,6 +48,12 @@ for audio_chunk, metrics in model.generate_stream(
 ):
     audio_chunks.append(audio_chunk)
     print(f"✓ Chunk {metrics.chunk_count} received, duration: {audio_chunk.shape[-1] / model.sr:.2f}s")
+
+    # Play chunk immediately
+    if AUDIO_AVAILABLE:
+        audio_np = audio_chunk.squeeze().cpu().numpy()
+        sd.play(audio_np, model.sr)
+        sd.wait()  # Wait for chunk to finish playing
 
 # Save streaming result
 final_audio = torch.cat(audio_chunks, dim=-1)
