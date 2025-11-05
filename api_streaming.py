@@ -313,10 +313,18 @@ async def generate_complete(request: TTSRequest):
 
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--port", type=int, default=8002, help="Port to run server on")
+    parser.add_argument("--host", type=str, default="0.0.0.0", help="Host to bind to")
+    parser.add_argument("--workers", type=int, default=1, help="Number of workers")
+    args = parser.parse_args()
+
     uvicorn.run(
         "api_streaming:app",
-        host="0.0.0.0",
-        port=8000,
+        host=args.host,
+        port=args.port,
+        workers=args.workers,
         reload=False,
         log_level="info"
     )
